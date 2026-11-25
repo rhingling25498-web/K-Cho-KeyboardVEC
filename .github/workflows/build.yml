@@ -30,17 +30,8 @@ jobs:
           SOURCE_DIR="$PROJECT_DIR/source"
           BUILD_DIR="$PROJECT_DIR/build"
 
-          # Normalize the legacy language node to current Keyman KPS format.
-          SOURCE_DIR="$SOURCE_DIR" python - <<'PY'
-          from pathlib import Path
-          import os, re
-          p = Path(os.environ["SOURCE_DIR"]) / "k_cho_keyboard.kps"
-          s = p.read_text(encoding="utf-8")
-          s, count = re.subn(r'<Language>\s*<Name>Mün Chin</Name>\s*<ID>mwq</ID>\s*</Language>', '<Language ID="mwq">Mün Chin</Language>', s)
-          if count != 1:
-              raise SystemExit(f"Expected one legacy language entry, found {count}")
-          p.write_text(s, encoding="utf-8")
-          PY
+          # Normalize legacy KPS language metadata for current Keyman compiler.
+          SOURCE_DIR="$SOURCE_DIR" python -c 'from pathlib import Path; import os,re; p=Path(os.environ["SOURCE_DIR"])/"k_cho_keyboard.kps"; s=p.read_text(encoding="utf-8"); s,n=re.subn(r"<Language>\\s*<Name>Mün Chin</Name>\\s*<ID>mwq</ID>\\s*</Language>", "<Language ID=\\"mwq\\">Mün Chin</Language>", s); assert n == 1, f"Expected one language node, got {n}"; p.write_text(s,encoding="utf-8")'
           test -f "$SOURCE_DIR/k_cho_keyboard.kmn"
           test -f "$SOURCE_DIR/k_cho_keyboard.kps"
           test -f "$SOURCE_DIR/k_cho_keyboard.bmp"
