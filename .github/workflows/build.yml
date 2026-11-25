@@ -41,7 +41,7 @@ jobs:
               raise SystemExit(f"Expected one legacy language entry, found {count}")
           p.write_text(s, encoding="utf-8")
           PY
-         test -f "$SOURCE_DIR/k_cho_keyboard.kmn"
+          test -f "$SOURCE_DIR/k_cho_keyboard.kmn"
           test -f "$SOURCE_DIR/k_cho_keyboard.kps"
           test -f "$SOURCE_DIR/k_cho_keyboard.bmp"
           mkdir -p "$BUILD_DIR"
