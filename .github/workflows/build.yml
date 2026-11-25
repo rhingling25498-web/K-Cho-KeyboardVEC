@@ -1,0 +1,77 @@
+
+name: Build K'Cho Keyboard
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Keyman command-line compiler
+        run: npm install --global @keymanapp/kmc
+
+      - name: Find or extract K'Cho source project
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -f "$GITHUB_WORKSPACE/source/k_cho_keyboard.kpj" ]; then
+            PROJECT_DIR="$GITHUB_WORKSPACE"
+          else
+            ZIP_FILE="$(find "$GITHUB_WORKSPACE" -type f -iname 'KCho-Keyboard-Source.zip' -not -path '*/.git/*' -print -quit)"
+
+            if [ -z "$ZIP_FILE" ]; then
+              echo "ERROR: Could not find KCho-Keyboard-Source.zip"
+              exit 1
+            fi
+
+            EXTRACT_DIR="$GITHUB_WORKSPACE/.kcho-source-extracted"
+            mkdir -p "$EXTRACT_DIR"
+            unzip -q "$ZIP_FILE" -d "$EXTRACT_DIR"
+
+            if [ -f "$EXTRACT_DIR/KCho-Keyboard-Source/source/k_cho_keyboard.kpj" ]; then
+              PROJECT_DIR="$EXTRACT_DIR/KCho-Keyboard-Source"
+            elif [ -f "$EXTRACT_DIR/source/k_cho_keyboard.kpj" ]; then
+              PROJECT_DIR="$EXTRACT_DIR"
+            else
+              echo "ERROR: Keyman project file not found in ZIP."
+              find "$EXTRACT_DIR" -maxdepth 4 -type f -print
+              exit 1
+            fi
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Using project: $PROJECT_DIR"
+
+      - name: Build keyboard with kmc
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$PROJECT_DIR/source"
+          kmc build .
+
+      - name: Upload compiled keyboard files
+        uses: actions/upload-artifact@v4
+        with:
+          name: k-cho-keyboard-build
+          path: |
+            ${{ env.PROJECT_DIR }}/source/build/**
+          if-no-files-found: warn
+          retention-days: 30
