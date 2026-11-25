@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js
@@ -24,54 +24,85 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Keyman command-line compiler
+      - name: Install Keyman Compiler
         run: npm install --global @keymanapp/kmc
 
-      - name: Find or extract K'Cho source project
+      - name: Find and extract K'Cho ZIP
         shell: bash
         run: |
           set -euo pipefail
 
-          if [ -f "$GITHUB_WORKSPACE/source/k_cho_keyboard.kpj" ]; then
-            PROJECT_DIR="$GITHUB_WORKSPACE"
-          else
-            ZIP_FILE="$(find "$GITHUB_WORKSPACE" -type f -iname 'KCho-Keyboard-Source.zip' -not -path '*/.git/*' -print -quit)"
+          ZIP_FILE=$(find "$GITHUB_WORKSPACE" \
+            -maxdepth 2 \
+            -type f \
+            -iname 'KCho-Keyboard-Source.zip' \
+            -not -path '*/.git/*' \
+            -print -quit)
 
-            if [ -z "$ZIP_FILE" ]; then
-              echo "ERROR: Could not find KCho-Keyboard-Source.zip"
-              exit 1
-            fi
-
-            EXTRACT_DIR="$GITHUB_WORKSPACE/.kcho-source-extracted"
-            mkdir -p "$EXTRACT_DIR"
-            unzip -q "$ZIP_FILE" -d "$EXTRACT_DIR"
-
-            if [ -f "$EXTRACT_DIR/KCho-Keyboard-Source/source/k_cho_keyboard.kpj" ]; then
-              PROJECT_DIR="$EXTRACT_DIR/KCho-Keyboard-Source"
-            elif [ -f "$EXTRACT_DIR/source/k_cho_keyboard.kpj" ]; then
-              PROJECT_DIR="$EXTRACT_DIR"
-            else
-              echo "ERROR: Keyman project file not found in ZIP."
-              find "$EXTRACT_DIR" -maxdepth 4 -type f -print
-              exit 1
-            fi
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: KCho-Keyboard-Source.zip not found!"
+            exit 1
           fi
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Using project: $PROJECT_DIR"
+          EXTRACT_DIR="$GITHUB_WORKSPACE/.kcho-source"
+          mkdir -p "$EXTRACT_DIR"
 
-      - name: Build keyboard with kmc
+          unzip -q "$ZIP_FILE" -d "$EXTRACT_DIR"
+
+          SOURCE_FILE=$(find "$EXTRACT_DIR" \
+            -type f \
+            -name 'k_cho_keyboard.kmn' \
+            -print -quit)
+
+          if [ -z "$SOURCE_FILE" ]; then
+            echo "ERROR: Keyboard source file not found!"
+            exit 1
+          fi
+
+          SOURCE_DIR=$(dirname "$SOURCE_FILE")
+
+          echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
+
+          echo "Found source: $SOURCE_FILE"
+
+      - name: Compile K'Cho Keyboard
         shell: bash
         run: |
           set -euo pipefail
-          cd "$PROJECT_DIR/source"
-          kmc build .
 
-      - name: Upload compiled keyboard files
+          cd "$SOURCE_DIR"
+
+          kmc build k_cho_keyboard.kmn
+
+          echo "Keyboard compilation completed!"
+
+      - name: Check Build Output
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Checking compiled files..."
+
+          find "$SOURCE_DIR" -maxdepth 2 \
+            -type f \
+            \( -name '*.kmx' -o -name '*.js' -o -name '*.kvk' \) \
+            -print
+
+          if ! find "$SOURCE_DIR" -maxdepth 2 \
+            -type f \
+            \( -name '*.kmx' -o -name '*.js' \) \
+            | grep -q .; then
+            echo "ERROR: No compiled keyboard files found!"
+            exit 1
+          fi
+
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: k-cho-keyboard-build
+          name: KCho-Keyboard-Build
           path: |
-            ${{ env.PROJECT_DIR }}/source/build/**
-          if-no-files-found: warn
+            ${{ env.SOURCE_DIR }}/*.kmx
+            ${{ env.SOURCE_DIR }}/*.js
+            ${{ env.SOURCE_DIR }}/*.kvk
+          if-no-files-found: error
           retention-days: 30
