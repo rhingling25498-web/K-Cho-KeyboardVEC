@@ -3,9 +3,7 @@ name: Build K'Cho Keyboard
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [ "main", "master" ]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +12,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,85 +21,52 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Keyman Compiler
+      - name: Install Keyman compiler
         run: npm install --global @keymanapp/kmc
 
-      - name: Find and extract K'Cho ZIP
+      - name: Find and extract K'Cho source ZIP
         shell: bash
         run: |
           set -euo pipefail
-
-          ZIP_FILE=$(find "$GITHUB_WORKSPACE" \
-            -maxdepth 2 \
-            -type f \
-            -iname 'KCho-Keyboard-Source.zip' \
-            -not -path '*/.git/*' \
-            -print -quit)
-
+          ZIP_FILE="$(find "$GITHUB_WORKSPACE" -maxdepth 2 -type f -iname 'KCho-Keyboard-Source-Mun-Chin.zip' -not -path '*/.git/*' -print -quit)"
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: KCho-Keyboard-Source.zip not found!"
+            echo "ERROR: KCho-Keyboard-Source-Mun-Chin.zip was not found in the repository root."
             exit 1
           fi
-
-          EXTRACT_DIR="$GITHUB_WORKSPACE/.kcho-source"
+          EXTRACT_DIR="$GITHUB_WORKSPACE/.kcho-source-extracted"
           mkdir -p "$EXTRACT_DIR"
-
           unzip -q "$ZIP_FILE" -d "$EXTRACT_DIR"
-
-          SOURCE_FILE=$(find "$EXTRACT_DIR" \
-            -type f \
-            -name 'k_cho_keyboard.kmn' \
-            -print -quit)
-
-          if [ -z "$SOURCE_FILE" ]; then
-            echo "ERROR: Keyboard source file not found!"
-            exit 1
-          fi
-
-          SOURCE_DIR=$(dirname "$SOURCE_FILE")
-
+          SOURCE_DIR="$EXTRACT_DIR/KCho-Keyboard-Source/source"
+          test -f "$SOURCE_DIR/k_cho_keyboard.kmn"
+          test -f "$SOURCE_DIR/k_cho_keyboard.kps"
+          test -f "$SOURCE_DIR/k_cho_keyboard.ico"
           echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
 
-          echo "Found source: $SOURCE_FILE"
-
-      - name: Compile K'Cho Keyboard
+      - name: Compile keyboard
         shell: bash
         run: |
           set -euo pipefail
-
           cd "$SOURCE_DIR"
-
           kmc build k_cho_keyboard.kmn
 
-          echo "Keyboard compilation completed!"
-
-      - name: Check Build Output
+      - name: Build installable KMP package (Mün Chin, mwq)
         shell: bash
         run: |
           set -euo pipefail
+          cd "$SOURCE_DIR"
+          kmc build k_cho_keyboard.kps
+          test -f build/k_cho_keyboard.kmp
+          echo "KMP package created. Package metadata:"
+          unzip -p build/k_cho_keyboard.kmp kmp.json
 
-          echo "Checking compiled files..."
-
-          find "$SOURCE_DIR" -maxdepth 2 \
-            -type f \
-            \( -name '*.kmx' -o -name '*.js' -o -name '*.kvk' \) \
-            -print
-
-          if ! find "$SOURCE_DIR" -maxdepth 2 \
-            -type f \
-            \( -name '*.kmx' -o -name '*.js' \) \
-            | grep -q .; then
-            echo "ERROR: No compiled keyboard files found!"
-            exit 1
-          fi
-
-      - name: Upload Build Artifacts
+      - name: Upload installable package and build files
         uses: actions/upload-artifact@v4
         with:
-          name: KCho-Keyboard-Build
+          name: KCho-Keyboard-Mun-Chin
           path: |
-            ${{ env.SOURCE_DIR }}/*.kmx
-            ${{ env.SOURCE_DIR }}/*.js
-            ${{ env.SOURCE_DIR }}/*.kvk
+            ${{ env.SOURCE_DIR }}/build/k_cho_keyboard.kmp
+            ${{ env.SOURCE_DIR }}/build/k_cho_keyboard.kmx
+            ${{ env.SOURCE_DIR }}/build/k_cho_keyboard.kvk
+            ${{ env.SOURCE_DIR }}/build/k_cho_keyboard.js
           if-no-files-found: error
           retention-days: 30
