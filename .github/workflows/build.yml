@@ -1,4 +1,3 @@
-
 name: Build K'Cho Keyboard
 
 on:
@@ -12,130 +11,62 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install Keyman Compiler
+      - name: Install Keyman compiler
         run: npm install --global @keymanapp/kmc
-
-      - name: Extract Source ZIP
+      - name: Extract source
         shell: bash
         run: |
           set -euo pipefail
-
-          ZIP_FILE=$(find "$GITHUB_WORKSPACE" \
-            -maxdepth 2 -type f \
-            -iname 'KCho-Keyboard-Source-Mun-Chin.zip' \
-            -print -quit)
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "Source ZIP not found!"
-            exit 1
-          fi
-
+          ZIP_FILE="$GITHUB_WORKSPACE/KCho-Keyboard-Source-Mun-Chin.zip"
+          test -f "$ZIP_FILE"
           mkdir -p "$GITHUB_WORKSPACE/.kcho-source"
-
-          unzip -oq "$ZIP_FILE" \
-            -d "$GITHUB_WORKSPACE/.kcho-source"
-
+          unzip -oq "$ZIP_FILE" -d "$GITHUB_WORKSPACE/.kcho-source"
           PROJECT_DIR="$GITHUB_WORKSPACE/.kcho-source/KCho-Keyboard-Source"
           SOURCE_DIR="$PROJECT_DIR/source"
           BUILD_DIR="$PROJECT_DIR/build"
-
           test -f "$SOURCE_DIR/k_cho_keyboard.kmn"
           test -f "$SOURCE_DIR/k_cho_keyboard.kps"
-
+          test -f "$SOURCE_DIR/k_cho_keyboard.bmp"
           mkdir -p "$BUILD_DIR"
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "SOURCE_DIR=$SOURCE_DIR" >> "$GITHUB_ENV"
           echo "BUILD_DIR=$BUILD_DIR" >> "$GITHUB_ENV"
-
-      - name: Compile Keyboard
+      - name: Compile keyboard
         shell: bash
         run: |
           set -euo pipefail
-
           cd "$SOURCE_DIR"
-
           kmc build k_cho_keyboard.kmn
-
-          echo "Keyboard compilation completed."
-
-      - name: Copy Compiled Files to Package Folder
-        shell: bash
-        run: |
-          set -euo pipefail
-
           for EXT in kmx js kvk; do
-
-            FILE=$(find "$SOURCE_DIR" \
-              -maxdepth 3 \
-              -type f \
-              -name "k_cho_keyboard.$EXT" \
-              -not -path '*/build/*' \
-              -print -quit)
-
+            FILE=$(find "$SOURCE_DIR" -maxdepth 3 -type f -name "k_cho_keyboard.$EXT" -not -path '*/build/*' -print -quit)
             if [ -z "$FILE" ]; then
-              FILE=$(find "$SOURCE_DIR" \
-                -maxdepth 3 \
-                -type f \
-                -name "k_cho_keyboard.$EXT" \
-                -print -quit)
+              FILE=$(find "$SOURCE_DIR" -maxdepth 3 -type f -name "k_cho_keyboard.$EXT" -print -quit)
             fi
-
-            if [ -n "$FILE" ]; then
-              cp "$FILE" "$BUILD_DIR/"
-              echo "Copied: $EXT"
-            elif [ "$EXT" = "kmx" ]; then
-              echo "ERROR: KMx file not found!"
-              exit 1
-            fi
-
+            if [ -n "$FILE" ]; then cp "$FILE" "$BUILD_DIR/"; fi
           done
-
-          ls -lah "$BUILD_DIR"
-
-      - name: Build KMP Package
+          test -f "$BUILD_DIR/k_cho_keyboard.kmx"
+          test -f "$BUILD_DIR/k_cho_keyboard.js"
+          test -f "$BUILD_DIR/k_cho_keyboard.kvk"
+      - name: Build installable KMP
         shell: bash
         run: |
           set -euo pipefail
-
           cd "$SOURCE_DIR"
-
           kmc build k_cho_keyboard.kps
-
-          KMP_FILE=$(find "$PROJECT_DIR" \
-            -type f \
-            -name 'k_cho_keyboard.kmp' \
-            -print -quit)
-
-          if [ -z "$KMP_FILE" ]; then
-            echo "ERROR: KMP package was not generated!"
-            find "$PROJECT_DIR" -type f
-            exit 1
-          fi
-
+          KMP_FILE=$(find "$PROJECT_DIR" -type f -name 'k_cho_keyboard.kmp' -print -quit)
+          test -n "$KMP_FILE"
           echo "KMP_FILE=$KMP_FILE" >> "$GITHUB_ENV"
-
-          echo "Package successfully generated:"
           ls -lh "$KMP_FILE"
-
-      - name: Upload K'Cho Keyboard Package
+      - name: Upload installable package
         uses: actions/upload-artifact@v4
         with:
-          name: KCho-Keyboard-Mun-Chin
+          name: KCho-Keyboard-Installable-KMP
           path: |
             ${{ env.KMP_FILE }}
-            ${{ env.BUILD_DIR }}/*.kmx
-            ${{ env.BUILD_DIR }}/*.js
-            ${{ env.BUILD_DIR }}/*.kvk
           if-no-files-found: error
           retention-days: 30
