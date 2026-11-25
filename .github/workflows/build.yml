@@ -32,7 +32,7 @@ jobs:
 
           # Normalize legacy KPS language metadata for current Keyman compiler.
           SOURCE_DIR="$SOURCE_DIR" python -c 'from pathlib import Path; import os; p=Path(os.environ["SOURCE_DIR"])/"k_cho_keyboard.kps"; s=p.read_text(encoding="utf-8"); old="<Language>"+chr(10)+"          <Name>Mün Chin</Name>"+chr(10)+"          <ID>mwq</ID>"+chr(10)+"        </Language>"; new="<Language ID="+chr(34)+"mwq"+chr(34)+">Mün Chin</Language>"; assert old in s, "legacy language node not found"; p.write_text(s.replace(old,new,1),encoding="utf-8")'
-          SOURCE_DIR="$SOURCE_DIR" python -c 'from pathlib import Path; import os; p=Path(os.environ["SOURCE_DIR"])/"k_cho_keyboard.kps"; s=p.read_text(encoding="utf-8"); entry="""    <File>\n      <Name>k_cho_keyboard.bmp</Name>\n      <Description>Keyboard bitmap icon</Description>\n      <CopyLocation>0</CopyLocation>\n      <FileType>.bmp</FileType>\n    </File>\n"""; assert "</Files>" in s; p.write_text(s.replace("</Files>",entry+"</Files>",1),encoding="utf-8")'
+          SOURCE_DIR="$SOURCE_DIR" python -c 'from pathlib import Path; import os; p=Path(os.environ["SOURCE_DIR"])/"k_cho_keyboard.kps"; s=p.read_text(encoding="utf-8"); entry="""    <File>\n      <Name>k_cho_keyboard.bmp</Name>\n      <Description>Keyboard bitmap icon</Description>\n      <CopyLocation>0</CopyLocation>\n      <FileType>.bmp</FileType>\n    </File>\n"""; assert "</Files>" in s; s=s if "<Name>k_cho_keyboard.bmp</Name>" in s else s.replace("</Files>",entry+"</Files>",1); p.write_text(s,encoding="utf-8")'
           test -f "$SOURCE_DIR/k_cho_keyboard.kmn"
           test -f "$SOURCE_DIR/k_cho_keyboard.kps"
           test -f "$SOURCE_DIR/k_cho_keyboard.bmp"
